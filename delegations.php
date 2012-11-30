@@ -1,24 +1,22 @@
 <?
+//API-Key aus navbar Form
 $api_key = $_POST["api_key"];
+
+//Logout => Löscht Session-Key aus Cookie und $session_key
 $logout = $_GET["logout"];
-$deleg_unit = $_POST["deleg_unit"];
-$deleg_member = $_POST["deleg_member"];
-
-if($_GET["my_initiative"] == "true"){
-	setcookie("my_initiative", "true");
-} elseif($_GET["my_initiative"] == "false"){
-	setcookie("my_initiative", "false");
-}
-
 if($logout == "true"){
 	setcookie("session_key", "");
 	$session_key = "";
-}
-else{
+} else{
 	$session_key = $_COOKIE["session_key"];
 }
 
-if($session_key == ""){
+//Delegationen aus myModal
+$deleg_unit = $_POST["deleg_unit"];
+$deleg_member = $_POST["deleg_member"];
+
+//Neuen Session-Key erzeugen - POST /session
+if($session_key == "" && $api_key != ""){
 	$host = '88.198.24.116';
 	$path = '/session';
 	$data = 'key='.urlencode($api_key);
@@ -44,8 +42,10 @@ if($session_key == ""){
 	$session_key = $session_post1[0];
 }
 
+//Session-Key in Cookie speichern
 setcookie("session_key", $session_key);
 
+//Neue Delegation speichern od. alte löschen - POST /delegation
 if($deleg_unit != ""){
 	if($deleg_member != ""){
 		if($deleg_member == "!!delete"){
@@ -76,15 +76,16 @@ if($deleg_unit != ""){
 	}
 }
 
+//URL des API-Servers
 $base_url = "http://88.198.24.116:25520/";
 
-//issue_state wird aus der URI erhoben, wenn leer, dann voting
+//GET issue_state überprüfen, wenn leer, dann open
 $issue_state = $_GET["issue_state"];
 if($issue_state == ""){
-	$issue_state = "voting";
+	$issue_state = "open";
 }
 
-//area_id wird aus der URI erhoben, wenn leer, dann bisherige area_id
+//GET area_id überprüfen, wenn leer, dann bisherige area_id
 if($_GET["area_id"] != ""){
 	$area_id = $_GET["area_id"];
 }
@@ -93,7 +94,6 @@ if($_GET["area_id"] != ""){
 if($area_id != ""){
 	$area_url = "&area_id=" . $area_id;
 }
-
 
 
 //Initiativen werden aus der API gezogen, JSON => array
@@ -138,6 +138,13 @@ for ($i = 0; $i < count($issue_member); $i++) {
 	}
 }
 
+//Bild des derzeitigen Nutzers
+$url_image = $base_url . "member_image?session_key=" . $session_key . "&member_id=" . $current_member_id;
+$string_image = file_get_contents($url_image);
+$json_image = json_decode($string_image,true);
+$current_member_image = $json_image['result'][0]['data'];
+
+//Meine Initiativen werden aus der API gezogen, JSON => array
 $url_my = $base_url . "initiator?session_key=" . $session_key . "&member_id=" . $current_member_id;
 $string_my = file_get_contents($url_my);
 $json_my = json_decode($string_my,true);
@@ -145,6 +152,7 @@ for ($i = 0; $i < count($json_my['result']); $i++) {
 	$issue_my[] = $json_my['result'][$i]['initiative_id'];
 }
 
+//Delegierte Units werden aus der API gezogen, JSON => array
 $url_delegation_unit = $base_url . "delegation?scope=unit&direction=out&session_key=" . $session_key . "&member_id=" . $current_member_id;
 $string_delegation_unit = file_get_contents($url_delegation_unit);
 $json_delegation_unit = json_decode($string_delegation_unit,true);
@@ -153,6 +161,7 @@ for ($i = 0; $i < count($json_delegation_unit['result']); $i++) {
 	$array_delegation_unit[$i][1] = $json_delegation_unit['result'][$i]['trustee_id'];
 }
 
+//Alle Units werden aus der API gezogen, JSON => array
 $url_unit = $base_url . "unit?session_key=" . $session_key;
 $string_unit = file_get_contents($url_unit);
 $json_unit = json_decode($string_unit,true);
@@ -160,13 +169,6 @@ for ($i = 0; $i < count($json_unit['result']); $i++) {
 	$array_unit[$i][0] = $json_unit['result'][$i]['id'];
 	$array_unit[$i][1] = $json_unit['result'][$i]['name'];
 }
-
-//Session-Infos werden aus der API gezogen
-//ID des derzeitigen Nutzers: JSON => string
-$url_image = $base_url . "member_image?session_key=" . $session_key . "&member_id=" . $current_member_id;
-$string_image = file_get_contents($url_image);
-$json_image = json_decode($string_image,true);
-$current_member_image = $json_image['result'][0]['data'];
 
 //Custom Sortierfunktion
 function cmp($a,$b){
@@ -194,7 +196,9 @@ function cmpp($a,$b){
 
 //Initiativen werden nach Themen sortiert
 usort($issue, 'cmp');
+//Meine Initiativen werden sortiert
 usort($issue_my, 'cmp');
+//Nutzer werden alphabetisch nach Namen sortiert
 usort($issue_member, 'cmpp');
 ?>
 
@@ -211,12 +215,17 @@ usort($issue_member, 'cmpp');
     <link href="css/bootstrap.css" rel="stylesheet">
     <style type="text/css">
       body {
+				background: #4c2582 url('img/Banner_Sonne_web.jpg') no-repeat;
         padding-top: 60px;
         padding-bottom: 40px;
       }
       .sidebar-nav {
         padding: 9px 0;
       }
+			footer {
+				color: white;
+			}
+    </style>
     </style>
     <link href="css/bootstrap-responsive.css" rel="stylesheet">
 
@@ -254,9 +263,9 @@ usort($issue_member, 'cmpp');
 						<h2>Delegationen</h2>
 						<p>Hier kannst du deine Delegationen einsehen und bearbeiten:</p>
 						<p><a class="btn" href="#change" data-toggle="modal">Delegationen ändern & hinzufügen & entfernen</a></p>
-          </div><!--/.well -->
-					<table class="table table-hover"><thead><tr><th>Delegierter Bereich</th><th>Delegiert an</th></tr></thead><tbody>
+						<table class="table table-hover"><thead><tr><th>Delegierter Bereich</th><th>Delegiert an</th></tr></thead><tbody>
 <?
+//Delegationen aus array in anderes array
 for ($i = 0; $i < count($array_delegation_unit); $i++) {
 	for ($e = 0; $e < count($array_unit); $e++) {
 		if($array_delegation_unit[$i][0] == $array_unit[$e][0]){
@@ -270,15 +279,18 @@ for ($i = 0; $i < count($array_delegation_unit); $i++) {
 	}
 }
 
+//Array in Tabelle ausgeben
 for ($i = 0; $i < count($delegation_output); $i++) {
 	echo "<tr><td>" . $delegation_output[$i][0] . "</td><td>" . $delegation_output[$i][1] . "</td></tr>";
 }
 
+//"Fehlermeldung"
 if($delegation_output[0][0] == ""){
-	echo "<tr><td>Bisher keine Delegationen angelegt!</td></tr>";
+	echo "<tr><td>Bisher keine Delegationen angelegt!</td><td></td></tr>";
 }
 ?>
-				</tbody></table>
+					</tbody></table>
+         </div><!--/.well -->
 
 <!-- Modal -->
 <div id="change" class="modal hide fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
@@ -293,6 +305,7 @@ if($delegation_output[0][0] == ""){
 		<select name="deleg_unit">
 			<option value="">Wähle eine Gliederung</option>
 <?
+//Alle Units auflisten
 for ($i = 0; $i < count($array_unit); $i++) {
 	echo "<option value=\"" . $array_unit[$i][0] . "\">" . $array_unit[$i][1] . "</option>";
 }
@@ -308,6 +321,7 @@ for ($i = 0; $i < count($array_unit); $i++) {
 			<option value="">Wähle einen Nutzer</option>
 			<option value="!!delete">--Delegation aufheben--</option>
 <?
+//Alle Nutzer auflisten
 for ($i = 0; $i < count($issue_member); $i++) {
 	if($issue_member[$i][1] != ""){
 		echo "<option value=\"" . $issue_member[$i][0] . "\">" . $issue_member[$i][1] . "</option>";
@@ -325,8 +339,6 @@ for ($i = 0; $i < count($issue_member); $i++) {
 </div>
         </div><!--/span-->
       </div><!--/row-->
-
-      <hr>
 
       <footer>
         <p>Eine kleine Spielerei von Bernhard <a href="http://wiki.piratenpartei.at/wiki/Benutzer:Burnoutberni">'burnoutberni'</a> Hayden.</p>

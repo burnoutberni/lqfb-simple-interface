@@ -1,22 +1,18 @@
 <?
+//API-Key aus navbar Form
 $api_key = $_POST["api_key"];
+
+//Logout => Löscht Session-Key aus Cookie und $session_key
 $logout = $_GET["logout"];
-
-if($_GET["my_initiative"] == "true"){
-	setcookie("my_initiative", "true");
-} elseif($_GET["my_initiative"] == "false"){
-	setcookie("my_initiative", "false");
-}
-
 if($logout == "true"){
 	setcookie("session_key", "");
 	$session_key = "";
-}
-else{
+} else{
 	$session_key = $_COOKIE["session_key"];
 }
 
-if($session_key == ""){
+//Neuen Session-Key erzeugen - POST /session
+if($session_key == "" && $api_key != ""){
 	$host = '88.198.24.116';
 	$path = '/session';
 	$data = 'key='.urlencode($api_key);
@@ -42,17 +38,19 @@ if($session_key == ""){
 	$session_key = $session_post1[0];
 }
 
+//Session-Key in Cookie speichern
 setcookie("session_key", $session_key);
 
+//URL des API-Servers
 $base_url = "http://88.198.24.116:25520/";
 
-//issue_state wird aus der URI erhoben, wenn leer, dann voting
+//GET issue_state überprüfen, wenn leer, dann open
 $issue_state = $_GET["issue_state"];
 if($issue_state == ""){
 	$issue_state = "open";
 }
 
-//area_id wird aus der URI erhoben, wenn leer, dann bisherige area_id
+//GET area_id überprüfen, wenn leer, dann bisherige area_id
 if($_GET["area_id"] != ""){
 	$area_id = $_GET["area_id"];
 }
@@ -84,7 +82,7 @@ for ($i = 0; $i < count($json_area['result']); $i++) {
 }
 
 //User-Liste werden aus der API gezogen, JSON => array
-$url_member = $base_url . "member?session_key=" . $session_key;
+$url_member = $base_url . "member?limit=1000&session_key=" . $session_key;
 $string_member = file_get_contents($url_member);
 $json_member = json_decode($string_member,true);
 for ($i = 0; $i < count($json_member['result']); $i++) {
@@ -106,19 +104,19 @@ for ($i = 0; $i < count($issue_member); $i++) {
 	}
 }
 
+//Bild des derzeitigen Nutzers
+$url_image = $base_url . "member_image?session_key=" . $session_key . "&member_id=" . $current_member_id;
+$string_image = file_get_contents($url_image);
+$json_image = json_decode($string_image,true);
+$current_member_image = $json_image['result'][0]['data'];
+
+//Meine Initiativen werden aus der API gezogen, JSON => array
 $url_my = $base_url . "initiator?session_key=" . $session_key . "&member_id=" . $current_member_id;
 $string_my = file_get_contents($url_my);
 $json_my = json_decode($string_my,true);
 for ($i = 0; $i < count($json_my['result']); $i++) {
 	$issue_my[] = $json_my['result'][$i]['initiative_id'];
 }
-
-//Session-Infos werden aus der API gezogen
-//ID des derzeitigen Nutzers: JSON => string
-$url_image = $base_url . "member_image?session_key=" . $session_key . "&member_id=" . $current_member_id;
-$string_image = file_get_contents($url_image);
-$json_image = json_decode($string_image,true);
-$current_member_image = $json_image['result'][0]['data'];
 
 //Custom Sortierfunktion
 function cmp($a,$b){
@@ -134,6 +132,7 @@ function cmp($a,$b){
 
 //Initiativen werden nach Themen sortiert
 usort($issue, 'cmp');
+//Meine Initiativen werden nach Themen sortiert
 usort($issue_my, 'cmp');
 ?>
 
@@ -150,15 +149,15 @@ usort($issue_my, 'cmp');
     <link href="css/bootstrap.css" rel="stylesheet">
     <style type="text/css">
       body {
-				background: url('../img/bg-tags-at.png') repeat;
+				background: #4c2582 url('img/Banner_Sonne_web.jpg') no-repeat;
         padding-top: 60px;
         padding-bottom: 40px;
       }
       .sidebar-nav {
         padding: 9px 0;
       }
-			#footer {
-				background: white;
+			footer {
+				color: white;
 			}
     </style>
     <link href="css/bootstrap-responsive.css" rel="stylesheet">
@@ -236,15 +235,8 @@ for ($i = 0; $i < count($issue_area); $i++) {
             <ul class="nav nav-list">
 							<li>
 <?
+//Initiativen werden nach Themen gruppiert ausgegeben
 for ($i = 0; $i < count($issue); $i++) {
-	if($_COOKIE["my_initiative"] == "true"){
-		if(in_array($issue[$i][2], $issue_my) == "true"){
-			goto c;
-		} else{
-			goto d;
-		}
-	}
-	c:
 	if($i != 0){
 		$iless = $i - 1;
 		if($issue[$iless][0] == $issue[$i][0]){
@@ -279,7 +271,6 @@ for ($i = 0; $i < count($issue); $i++) {
 		echo $issue[$i][1];
 		echo "</a></li>";
 	}
-	d:
 }
 echo "<li class=\"nav-header\">Keine weiteren Inhalte in diesem Themenbereich enthalten!</li></ul></li>";
 ?>
@@ -287,16 +278,13 @@ echo "<li class=\"nav-header\">Keine weiteren Inhalte in diesem Themenbereich en
           </div><!--/.well -->
         </div><!--/span-->
       </div><!--/row-->
-		</div><!--/.fluid-container-->
-		<div id="footer" style="margin:0px;">
-      <hr>
 
       <footer>
         <p>Eine kleine Spielerei von Bernhard <a href="http://wiki.piratenpartei.at/wiki/Benutzer:Burnoutberni">'burnoutberni'</a> Hayden.</p>
 				<p>Datenquelle: <a href="http://lqfb.piratenpartei.at">http://lqfb.piratenpartei.at</a></p>
       </footer>
 
-    </div>
+    </div><!--/.fluid-container-->
 
     <!-- Le javascript
     ================================================== -->
